@@ -1,0 +1,587 @@
+﻿<Window x:Class="IISLogAnalyzer_WPF.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="IIS Log Analyzer" Height="800" Width="1450" MinHeight="700" MinWidth="1400">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <DropShadowEffect x:Key="DropShadow" Color="Black" Opacity="0.3" BlurRadius="10" ShadowDepth="4"/>
+    </Window.Resources>
+    <Grid Background="#1E1E1E">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="250"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Sidebar -->
+        <Border Grid.Column="0" Background="#1E2A32">
+            <Border.Effect>
+                <DropShadowEffect Color="Black" Opacity="0.3" BlurRadius="10" ShadowDepth="2"/>
+            </Border.Effect>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="18">
+                    <!-- Header -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,18">
+                        <TextBlock Text="📊" FontSize="24" Margin="0,0,8,0"/>
+                        <StackPanel>
+                            <TextBlock Text="IIS LOG" FontSize="16" FontWeight="Bold" Foreground="White" LineHeight="16"/>
+                            <TextBlock Text="ANALYZER" FontSize="16" FontWeight="Bold" Foreground="#4DB6AC" LineHeight="16"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Load Button -->
+                    <Button Command="{Binding LoadLogsCommand}" Height="42" Background="#4DB6AC" Foreground="White" BorderThickness="0" FontWeight="Bold" Margin="0,0,0,12" Cursor="Hand">
+                        <Button.Effect>
+                            <DropShadowEffect Color="#4DB6AC" Opacity="0.5" BlurRadius="8" ShadowDepth="0"/>
+                        </Button.Effect>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <TextBlock Text="📁" FontSize="18" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="LOAD LOG FILE" FontSize="12" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    
+                    <!-- File Info -->
+                    <Border Background="#2A3A42" CornerRadius="6" Padding="8,6" Margin="0,0,0,15">
+                        <StackPanel>
+                            <TextBlock Text="📄 Current File" Foreground="#90A4AE" FontSize="8" Margin="0,0,0,3"/>
+                            <TextBlock Text="{Binding LoadedFileName}" Foreground="#ECEFF1" TextWrapping="Wrap" FontSize="9" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Separator Background="#37474F" Margin="0,0,0,15"/>
+
+                    <!-- Search Section -->
+                    <StackPanel Margin="0,0,0,18">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <TextBlock Text="🔍" FontSize="14" Margin="0,0,6,0"/>
+                            <TextBlock Text="SEARCH" Foreground="#90CAF9" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        
+                        <!-- Search Type Selector -->
+                        <ComboBox ItemsSource="{Binding SearchTypes}" 
+                                  SelectedItem="{Binding SearchType}"
+                                  Foreground="White" 
+                                  FontSize="11"
+                                  Margin="0,0,0,8">
+                            <ComboBox.Style>
+                                <Style TargetType="ComboBox">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ComboBox">
+                                                <Grid>
+                                                    <ToggleButton Name="ToggleButton" 
+                                                                  Background="#2A3A42"
+                                                                  BorderBrush="#37474F"
+                                                                  BorderThickness="1"
+                                                                  Focusable="false"
+                                                                  IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                                                  ClickMode="Press">
+                                                        <ToggleButton.Style>
+                                                            <Style TargetType="ToggleButton">
+                                                                <Setter Property="Template">
+                                                                    <Setter.Value>
+                                                                        <ControlTemplate TargetType="ToggleButton">
+                                                                            <Border Background="{TemplateBinding Background}"
+                                                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                                                    BorderThickness="{TemplateBinding BorderThickness}">
+                                                                                <Grid>
+                                                                                    <Grid.ColumnDefinitions>
+                                                                                        <ColumnDefinition/>
+                                                                                        <ColumnDefinition Width="20"/>
+                                                                                    </Grid.ColumnDefinitions>
+                                                                                    <Border Grid.ColumnSpan="2" Background="#2A3A42"/>
+                                                                                    <ContentPresenter Grid.Column="0" Margin="8,6"/>
+                                                                                    <Path Grid.Column="1" 
+                                                                                          HorizontalAlignment="Center" 
+                                                                                          VerticalAlignment="Center"
+                                                                                          Data="M 0 0 L 4 4 L 8 0 Z"
+                                                                                          Fill="White"/>
+                                                                                </Grid>
+                                                                            </Border>
+                                                                        </ControlTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </Style>
+                                                        </ToggleButton.Style>
+                                                    </ToggleButton>
+                                                    <ContentPresenter Name="ContentSite"
+                                                                      IsHitTestVisible="False"
+                                                                      Content="{TemplateBinding SelectionBoxItem}"
+                                                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                                      ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                                                      Margin="8,6,25,6"
+                                                                      VerticalAlignment="Center"
+                                                                      HorizontalAlignment="Left"/>
+                                                    <Popup Name="Popup"
+                                                           Placement="Bottom"
+                                                           IsOpen="{TemplateBinding IsDropDownOpen}"
+                                                           AllowsTransparency="True"
+                                                           Focusable="False"
+                                                           PopupAnimation="Slide">
+                                                        <Grid Name="DropDown"
+                                                              SnapsToDevicePixels="True"
+                                                              MinWidth="{TemplateBinding ActualWidth}"
+                                                              MaxHeight="200">
+                                                            <Border Background="#2A3A42"
+                                                                    BorderBrush="#37474F"
+                                                                    BorderThickness="1"/>
+                                                            <ScrollViewer Margin="1" SnapsToDevicePixels="True">
+                                                                <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                                            </ScrollViewer>
+                                                        </Grid>
+                                                    </Popup>
+                                                </Grid>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ComboBox.Style>
+                            <ComboBox.ItemContainerStyle>
+                                <Style TargetType="ComboBoxItem">
+                                    <Setter Property="Background" Value="#2A3A42"/>
+                                    <Setter Property="Foreground" Value="White"/>
+                                    <Setter Property="Padding" Value="8,6"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ComboBoxItem">
+                                                <Border Name="Border" 
+                                                        Background="{TemplateBinding Background}" 
+                                                        Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsHighlighted" Value="True">
+                                                        <Setter TargetName="Border" Property="Background" Value="#4DB6AC"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter TargetName="Border" Property="Background" Value="#37474F"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ComboBox.ItemContainerStyle>
+                        </ComboBox>
+                        
+                        <!-- Search Input -->
+                        <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" 
+                                 Background="#2A3A42" 
+                                 Foreground="White" 
+                                 BorderBrush="#37474F" 
+                                 BorderThickness="1" 
+                                 Padding="8,6" 
+                                 FontSize="11">
+                            <TextBox.Style>
+                                <Style TargetType="TextBox">
+                                    <Style.Triggers>
+                                        <Trigger Property="Text" Value="">
+                                            <Setter Property="Background" Value="#2A3A42"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBox.Style>
+                        </TextBox>
+                        <TextBlock Text="Search by selected criteria" 
+                                   Foreground="#607D8B" 
+                                   FontSize="9" 
+                                   Margin="0,4,0,0"/>
+                    </StackPanel>
+
+                    <!-- Error Filter -->
+                    <Border Background="#2A3A42" CornerRadius="6" Padding="12,10" Margin="0,0,0,18">
+                        <StackPanel>
+                            <CheckBox IsChecked="{Binding ShowErrorsOnly}" Foreground="White" FontWeight="SemiBold" FontSize="11">
+                                <CheckBox.Content>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="⚠️" Margin="0,0,6,0"/>
+                                        <TextBlock Text="Errors Only"/>
+                                    </StackPanel>
+                                </CheckBox.Content>
+                            </CheckBox>
+                            <TextBlock Text="Filter status codes >= 400" Foreground="#EF5350" FontSize="9" Margin="24,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Date & Time Range -->
+                    <StackPanel Margin="0,0,0,12">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <TextBlock Text="📅" FontSize="12" Margin="0,0,5,0"/>
+                            <TextBlock Text="DATE &amp; TIME" Foreground="#90CAF9" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        
+                        <!-- Start DateTime Button & Popup -->
+                        <Border Background="#2A3A42" CornerRadius="6" Padding="10,8" Margin="0,0,0,10">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="▶" Foreground="#4DB6AC" FontSize="9" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Start Date &amp; Time" Foreground="#ECEFF1" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                
+                                <Button x:Name="StartDateTimeButton" Background="#1E2A32" BorderBrush="#4DB6AC" BorderThickness="2" 
+                                        Padding="10,8" HorizontalContentAlignment="Left" Cursor="Hand">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}" 
+                                                    BorderBrush="{TemplateBinding BorderBrush}" 
+                                                    BorderThickness="{TemplateBinding BorderThickness}" 
+                                                    CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0">
+                                                        <TextBlock Text="{Binding StartDateDisplay}" Foreground="White" FontSize="12" FontWeight="SemiBold"/>
+                                                        <TextBlock Text="Click to select" Foreground="#607D8B" FontSize="9" Margin="0,1,0,0"/>
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="📅" FontSize="14" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                                
+                                <Popup x:Name="StartDateTimePopup" PlacementTarget="{Binding ElementName=StartDateTimeButton}" 
+                                       Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
+                                    <Border Background="White" BorderBrush="#4DB6AC" BorderThickness="2" CornerRadius="8" 
+                                            Padding="15" Effect="{StaticResource DropShadow}">
+                                        <StackPanel Width="220">
+                                            <TextBlock Text="Start Date" FontSize="14" FontWeight="Bold" 
+                                                       Foreground="#263238" Margin="0,0,0,12"/>
+                                            
+                                            <!-- Calendar -->
+                                            <Calendar SelectedDate="{Binding StartDate}" BorderThickness="0"
+                                                      RenderTransformOrigin="0,0">
+                                                <Calendar.LayoutTransform>
+                                                    <ScaleTransform ScaleX="0.9" ScaleY="0.9"/>
+                                                </Calendar.LayoutTransform>
+                                            </Calendar>
+                                            
+                                            <!-- Include Time Checkbox -->
+                                            <CheckBox Content="Include Time" IsChecked="{Binding IncludeStartTime}" 
+                                                      Foreground="#263238" FontSize="11" Margin="0,12,0,0"/>
+                                            
+                                            <!-- Time Input (conditional) -->
+                                            <StackPanel Visibility="{Binding IncludeStartTime, Converter={StaticResource BoolToVisibilityConverter}}" 
+                                                        Margin="0,8,0,0">
+                                                <TextBlock Text="Time (HH:MM)" FontSize="10" Foreground="#78909C" Margin="0,0,0,6"/>
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                    <TextBox Text="{Binding StartHourInput, UpdateSourceTrigger=PropertyChanged}" 
+                                                             Width="38" Height="36" FontSize="18" FontWeight="Bold" 
+                                                             TextAlignment="Center" Foreground="#1976D2"
+                                                             Background="#E3F2FD" BorderBrush="#90CAF9" BorderThickness="1"
+                                                             MaxLength="2" VerticalContentAlignment="Center"
+                                                             GotFocus="TimeTextBox_GotFocus"/>
+                                                    <TextBlock Text=":" FontSize="24" FontWeight="Bold" 
+                                                               VerticalAlignment="Center" Margin="4,0" Foreground="#1976D2"/>
+                                                    <TextBox Text="{Binding StartMinuteInput, UpdateSourceTrigger=PropertyChanged}" 
+                                                             Width="38" Height="36" FontSize="18" FontWeight="Bold" 
+                                                             TextAlignment="Center" Foreground="#1976D2"
+                                                             Background="#E3F2FD" BorderBrush="#90CAF9" BorderThickness="1"
+                                                             MaxLength="2" VerticalContentAlignment="Center"
+                                                             GotFocus="TimeTextBox_GotFocus"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                            
+                                            <Button Content="OK" Background="#2196F3" Foreground="White" 
+                                                    BorderThickness="0" Padding="0,10" FontSize="13" FontWeight="SemiBold"
+                                                    Margin="0,12,0,0" Cursor="Hand" Click="StartDateTimeConfirm_Click"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Popup>
+                            </StackPanel>
+                        </Border>
+                        
+                        <!-- End DateTime Button & Popup -->
+                        <Border Background="#2A3A42" CornerRadius="6" Padding="10,8">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="⏹" Foreground="#EF5350" FontSize="9" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="End Date &amp; Time" Foreground="#ECEFF1" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                
+                                <Button x:Name="EndDateTimeButton" Background="#1E2A32" BorderBrush="#EF5350" BorderThickness="2" 
+                                        Padding="10,8" HorizontalContentAlignment="Left" Cursor="Hand">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}" 
+                                                    BorderBrush="{TemplateBinding BorderBrush}" 
+                                                    BorderThickness="{TemplateBinding BorderThickness}" 
+                                                    CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0">
+                                                        <TextBlock Text="{Binding EndDateDisplay}" Foreground="White" FontSize="12" FontWeight="SemiBold"/>
+                                                        <TextBlock Text="Click to select" Foreground="#607D8B" FontSize="9" Margin="0,1,0,0"/>
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="📅" FontSize="14" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                                
+                                <Popup x:Name="EndDateTimePopup" PlacementTarget="{Binding ElementName=EndDateTimeButton}" 
+                                       Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
+                                    <Border Background="White" BorderBrush="#EF5350" BorderThickness="2" CornerRadius="8" 
+                                            Padding="15" Effect="{StaticResource DropShadow}">
+                                        <StackPanel Width="220">
+                                            <TextBlock Text="End Date" FontSize="14" FontWeight="Bold" 
+                                                       Foreground="#263238" Margin="0,0,0,12"/>
+                                            
+                                            <!-- Calendar -->
+                                            <Calendar SelectedDate="{Binding EndDate}" BorderThickness="0"
+                                                      RenderTransformOrigin="0,0">
+                                                <Calendar.LayoutTransform>
+                                                    <ScaleTransform ScaleX="0.9" ScaleY="0.9"/>
+                                                </Calendar.LayoutTransform>
+                                            </Calendar>
+                                            
+                                            <!-- Include Time Checkbox -->
+                                            <CheckBox Content="Include Time" IsChecked="{Binding IncludeEndTime}" 
+                                                      Foreground="#263238" FontSize="11" Margin="0,12,0,0"/>
+                                            
+                                            <!-- Time Input (conditional) -->
+                                            <StackPanel Visibility="{Binding IncludeEndTime, Converter={StaticResource BoolToVisibilityConverter}}" 
+                                                        Margin="0,8,0,0">
+                                                <TextBlock Text="Time (HH:MM)" FontSize="10" Foreground="#78909C" Margin="0,0,0,6"/>
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                    <TextBox Text="{Binding EndHourInput, UpdateSourceTrigger=PropertyChanged}" 
+                                                             Width="38" Height="36" FontSize="18" FontWeight="Bold" 
+                                                             TextAlignment="Center" Foreground="#D32F2F"
+                                                             Background="#FFEBEE" BorderBrush="#FFCDD2" BorderThickness="1"
+                                                             MaxLength="2" VerticalContentAlignment="Center"
+                                                             GotFocus="TimeTextBox_GotFocus"/>
+                                                    <TextBlock Text=":" FontSize="24" FontWeight="Bold" 
+                                                               VerticalAlignment="Center" Margin="4,0" Foreground="#D32F2F"/>
+                                                    <TextBox Text="{Binding EndMinuteInput, UpdateSourceTrigger=PropertyChanged}" 
+                                                             Width="38" Height="36" FontSize="18" FontWeight="Bold" 
+                                                             TextAlignment="Center" Foreground="#D32F2F"
+                                                             Background="#FFEBEE" BorderBrush="#FFCDD2" BorderThickness="1"
+                                                             MaxLength="2" VerticalContentAlignment="Center"
+                                                             GotFocus="TimeTextBox_GotFocus"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                            
+                                            <Button Content="OK" Background="#F44336" Foreground="White" 
+                                                    BorderThickness="0" Padding="0,10" FontSize="13" FontWeight="SemiBold"
+                                                    Margin="0,12,0,0" Cursor="Hand" Click="EndDateTimeConfirm_Click"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Popup>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+
+                    <!-- Action Buttons -->
+                    <StackPanel>
+                        <Button Command="{Binding ApplyFiltersCommand}" Height="40" Background="#2196F3" Foreground="White" 
+                                BorderThickness="0" FontWeight="Bold" Margin="0,0,0,10" Cursor="Hand" Padding="0,8">
+                            <TextBlock Text="APPLY FILTERS" FontSize="12"/>
+                        </Button>
+                        <Button Command="{Binding ClearFiltersCommand}" Height="40" Background="Transparent" 
+                                Foreground="#B0BEC5" BorderBrush="#455A64" BorderThickness="1" Cursor="Hand" Padding="0,8">
+                            <TextBlock Text="CLEAR FILTERS" FontSize="12"/>
+                        </Button>
+                    </StackPanel>
+                    
+                    <!-- Status Message -->
+                    <Border Background="#2A3A42" CornerRadius="6" Padding="10" Margin="0,18,0,0">
+                        <TextBlock Text="{Binding StatusMessage}" Foreground="#FFD54F" TextWrapping="Wrap" FontSize="10" TextAlignment="Center" FontWeight="SemiBold"/>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+        
+        <!-- Main -->
+        <Grid Grid.Column="1" Background="#F5F5F5">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+
+            <!-- Stats -->
+            <Border Grid.Row="0" Background="#ECEFF1" Padding="15" BorderBrush="#CFD8DC" BorderThickness="0,0,0,1">
+                <WrapPanel Orientation="Horizontal">
+                    <!-- Total Logs in File -->
+                    <Border Background="#4C566A" Padding="12,8" Margin="0,0,10,10" CornerRadius="6" MinWidth="100">
+                        <StackPanel>
+                            <TextBlock Text="Total Logs" Foreground="#D8DEE9" FontSize="10" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding TotalLogsInFile}" Foreground="White" FontSize="20" FontWeight="Bold"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Showing (Filtered) -->
+                    <Border Background="#5E81AC" Padding="12,8" Margin="0,0,10,10" CornerRadius="6" MinWidth="100">
+                        <StackPanel>
+                            <TextBlock Text="Showing" Foreground="#D8DEE9" FontSize="10" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding TotalRequests}" Foreground="White" FontSize="20" FontWeight="Bold"/>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- Success -->
+                    <Border Background="#A3BE8C" Padding="12,8" Margin="0,0,10,10" CornerRadius="6" MinWidth="100">
+                        <StackPanel>
+                            <TextBlock Text="Success" Foreground="#D8DEE9" FontSize="10" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding SuccessCount}" Foreground="White" FontSize="20" FontWeight="Bold"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Errors (All 4xx + 5xx) -->
+                    <Border Background="#BF616A" Padding="12,8" Margin="0,0,10,10" CornerRadius="6" MinWidth="100">
+                        <StackPanel>
+                            <TextBlock Text="Errors (4xx+5xx)" Foreground="#D8DEE9" FontSize="10" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding ErrorCount}" Foreground="White" FontSize="20" FontWeight="Bold"/>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- Redirects (3xx) -->
+                    <Border Background="#D08770" Padding="12,8" Margin="0,0,10,10" CornerRadius="6" MinWidth="100">
+                        <StackPanel>
+                            <TextBlock Text="Redirects (3xx)" Foreground="#ECEFF1" FontSize="10" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding RedirectCount}" Foreground="White" FontSize="20" FontWeight="Bold"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Client Errors (4xx) -->
+                    <Border Background="#EBCB8B" Padding="12,8" Margin="0,0,10,10" CornerRadius="6" MinWidth="100">
+                        <StackPanel>
+                            <TextBlock Text="Client Errors (4xx)" Foreground="#4C566A" FontSize="10" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding ClientErrorCount}" Foreground="#2E3440" FontSize="20" FontWeight="Bold"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Server Errors (5xx) -->
+                    <Border Background="#BF616A" Padding="12,8" Margin="0,0,10,10" CornerRadius="6" MinWidth="100">
+                        <StackPanel>
+                            <TextBlock Text="Server Errors (5xx)" Foreground="#D8DEE9" FontSize="10" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding ServerErrorCount}" Foreground="White" FontSize="20" FontWeight="Bold"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Total Token Requests -->
+                    <Border Background="#88C0D0" Padding="12,8" Margin="0,0,10,10" CornerRadius="6" MinWidth="100">
+                        <StackPanel>
+                            <TextBlock Text="Total Token Requests" Foreground="#2E3440" FontSize="10" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding TokenEndpointCount}" Foreground="#2E3440" FontSize="20" FontWeight="Bold"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- GET Requests -->
+                    <Border Background="#81A1C1" Padding="12,8" Margin="0,0,10,10" CornerRadius="6" MinWidth="100">
+                        <StackPanel>
+                            <TextBlock Text="GET Requests" Foreground="#D8DEE9" FontSize="10" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding GetRequestCount}" Foreground="White" FontSize="20" FontWeight="Bold"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- POST Requests -->
+                    <Border Background="#B48EAD" Padding="12,8" Margin="0,0,10,10" CornerRadius="6" MinWidth="100">
+                        <StackPanel>
+                            <TextBlock Text="POST Requests" Foreground="#D8DEE9" FontSize="10" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding PostRequestCount}" Foreground="White" FontSize="20" FontWeight="Bold"/>
+                        </StackPanel>
+                    </Border>
+                </WrapPanel>
+            </Border>
+
+            <!-- DataGrid -->
+            <DataGrid Grid.Row="1" ItemsSource="{Binding FilteredLogs}" 
+                      SelectedItem="{Binding SelectedLogEntry}"
+                      AutoGenerateColumns="False" 
+                      CanUserAddRows="False"
+                      SelectionUnit="FullRow"
+                      GridLinesVisibility="All"
+                      HorizontalGridLinesBrush="#EEEEEE"
+                      VerticalGridLinesBrush="#EEEEEE"
+                      HeadersVisibility="Column"
+                      Background="White"
+                      BorderThickness="0"
+                      RowHeight="34"
+                      Margin="15,0,15,15">
+                
+                <DataGrid.Resources>
+                    <Style TargetType="DataGridColumnHeader">
+                        <Setter Property="Background" Value="#FAFAFA"/>
+                        <Setter Property="Foreground" Value="#455A64"/>
+                        <Setter Property="Padding" Value="10,12"/>
+                        <Setter Property="FontWeight" Value="Bold"/>
+                        <Setter Property="FontSize" Value="12"/>
+                        <Setter Property="BorderThickness" Value="0,0,1,2"/>
+                        <Setter Property="BorderBrush" Value="#E0E0E0"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                        <Setter Property="VerticalContentAlignment" Value="Center"/>
+                    </Style>
+                    <Style TargetType="DataGridRow">
+                        <Setter Property="Background" Value="White"/>
+                        <Setter Property="SnapsToDevicePixels" Value="true"/>
+                        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                        <Setter Property="BorderBrush" Value="#F5F5F5"/>
+                        <Style.Triggers>
+                            <Trigger Property="ItemsControl.AlternationIndex" Value="1">
+                                <Setter Property="Background" Value="#FAFAFA"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#F1F8E9"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="#E0F2F1"/>
+                                <Setter Property="Foreground" Value="#00695C"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                    <Style TargetType="DataGridCell">
+                        <Setter Property="Padding" Value="4,0"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="DataGridCell">
+                                    <Border Background="{TemplateBinding Background}" BorderThickness="0">
+                                        <ContentPresenter VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                    <Style x:Key="CenterText" TargetType="TextBlock">
+                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                        <Setter Property="VerticalAlignment" Value="Center"/>
+                    </Style>
+                    <Style x:Key="LeftText" TargetType="TextBlock">
+                        <Setter Property="HorizontalAlignment" Value="Left"/>
+                        <Setter Property="VerticalAlignment" Value="Center"/>
+                        <Setter Property="Margin" Value="5,0,0,0"/>
+                    </Style>
+                </DataGrid.Resources>
+                
+                <DataGrid.AlternationCount>2</DataGrid.AlternationCount>
+
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Date" Binding="{Binding Timestamp, StringFormat='dd.MM.yyyy'}" IsReadOnly="True" Width="110" ElementStyle="{StaticResource CenterText}"/>
+                    <DataGridTextColumn Header="Time" Binding="{Binding Timestamp, StringFormat='HH:mm:ss'}" IsReadOnly="True" Width="100" ElementStyle="{StaticResource CenterText}"/>
+                    <DataGridTextColumn Header="Client IP" Binding="{Binding ClientIp}" IsReadOnly="True" Width="140" ElementStyle="{StaticResource CenterText}"/>
+                    <DataGridTextColumn Header="Method" Binding="{Binding Method}" IsReadOnly="True" FontWeight="Bold" Width="90" ElementStyle="{StaticResource CenterText}"/>
+                    <DataGridTemplateColumn Header="Status" Width="110">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Background="{Binding StatusBrush}" CornerRadius="12" Padding="12,3" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding StatusCode}" Foreground="White" FontWeight="Bold" FontSize="11" HorizontalAlignment="Center"/>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Time (s)" Binding="{Binding TimeTakenSeconds, StringFormat='{}{0:F2}'}" IsReadOnly="True" Width="100" ElementStyle="{StaticResource CenterText}"/>
+                    <DataGridTextColumn Header="Port" Binding="{Binding Port}" IsReadOnly="True" Width="80" ElementStyle="{StaticResource CenterText}"/>
+                    <DataGridTextColumn Header="URL / Resource" Binding="{Binding UriStem}" IsReadOnly="True" Width="*" ElementStyle="{StaticResource LeftText}"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
+    </Grid>
+</Window>
