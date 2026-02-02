@@ -17,6 +17,7 @@ namespace IISLogAnalyzer_WPF.ViewModels
     {
         private readonly LogParser _parser;
         private List<LogEntry> _allLogs = new();
+        private System.Threading.CancellationTokenSource? _filterCts;
 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string? propertyName = null) => 
@@ -472,6 +473,11 @@ namespace IISLogAnalyzer_WPF.ViewModels
 
         private async Task ApplyFiltersAsync()
         {
+            // Cancel previous operation
+            _filterCts?.Cancel();
+            _filterCts = new System.Threading.CancellationTokenSource();
+            var token = _filterCts.Token;
+
             // Capture filter values to avoid closure issues
             var showErrors = ShowErrorsOnly;
             var searchText = SearchText;
@@ -481,10 +487,14 @@ namespace IISLogAnalyzer_WPF.ViewModels
             var endDate = EndDate;
             var endTime = EndTime;
 
-            // Run filtering on background thread
-            var (filteredList, stats) = await Task.Run(() =>
+            try 
             {
-                var query = _allLogs.AsEnumerable();
+                // Run filtering on background thread
+                var asyncResult = await Task.Run(() =>
+                {
+                    token.ThrowIfCancellationRequested();
+
+                    var query = _allLogs.AsEnumerable();
 
                 // Error filter
                 if (showErrors) query = query.Where(l => l.IsError);
@@ -539,6 +549,9 @@ namespace IISLogAnalyzer_WPF.ViewModels
                 var uniqueIps = new HashSet<string>();
                 var urlCounts = new Dictionary<string, int>();
 
+                // Check cancel before heavy loop
+                token.ThrowIfCancellationRequested();
+
                 foreach (var log in result)
                 {
                     // Status code categories
@@ -570,6 +583,8 @@ namespace IISLogAnalyzer_WPF.ViewModels
                         maxTimeTaken = log.TimeTaken;
                 }
 
+                token.ThrowIfCancellationRequested();
+
                 // Find most requested URL
                 string mostRequested = "-";
                 if (urlCounts.Count > 0)
@@ -593,17 +608,18 @@ namespace IISLogAnalyzer_WPF.ViewModels
                     SlowestResponseTime = maxTimeTaken
                 };
 
-                return (result, statistics);
-            });
+                return (Logs: result, Stats: statistics);
+            }, token);
 
             // Update UI on UI thread
             FilteredLogs.Clear();
-            foreach (var log in filteredList)
+            foreach (var log in asyncResult.Logs)
             {
                 FilteredLogs.Add(log);
             }
 
             // Update statistics
+            var stats = asyncResult.Stats;
             TotalRequests = stats.TotalCount;
             SuccessCount = stats.SuccessCount;
             ErrorCount = stats.ErrorCount;
@@ -616,6 +632,12 @@ namespace IISLogAnalyzer_WPF.ViewModels
             TokenEndpointCount = stats.TokenEndpointCount;
             MostRequestedUrl = stats.MostRequestedUrl;
             SlowestResponseTime = stats.SlowestResponseTime;
+            
+            }
+            catch (OperationCanceledException)
+            {
+                // Ignore cancellation
+            }
         }
 
         // Helper class for statistics

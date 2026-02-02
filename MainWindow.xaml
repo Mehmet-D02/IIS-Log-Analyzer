@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="IIS Log Analyzer" Height="800" Width="1450" MinHeight="700" MinWidth="1400">
+        Title="IIS Log Analyzer" Height="800" Width="1330" MinHeight="700" MinWidth="1200">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         <DropShadowEffect x:Key="DropShadow" Color="Black" Opacity="0.3" BlurRadius="10" ShadowDepth="4"/>
@@ -288,7 +288,7 @@
                                             </StackPanel>
                                             
                                             <Button Content="OK" Background="#2196F3" Foreground="White" 
-                                                    BorderThickness="0" Padding="0,10" FontSize="13" FontWeight="SemiBold"
+                                                    BorderThickness="0" Padding="0,10" FontSize="12" FontWeight="SemiBold"
                                                     Margin="0,12,0,0" Cursor="Hand" Click="StartDateTimeConfirm_Click"/>
                                         </StackPanel>
                                     </Border>
@@ -452,13 +452,6 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Errors (All 4xx + 5xx) -->
-                    <Border Background="#BF616A" Padding="12,8" Margin="0,0,10,10" CornerRadius="6" MinWidth="100">
-                        <StackPanel>
-                            <TextBlock Text="Errors (4xx+5xx)" Foreground="#D8DEE9" FontSize="10" FontWeight="SemiBold"/>
-                            <TextBlock Text="{Binding ErrorCount}" Foreground="White" FontSize="20" FontWeight="Bold"/>
-                        </StackPanel>
-                    </Border>
                     
                     <!-- Redirects (3xx) -->
                     <Border Background="#D08770" Padding="12,8" Margin="0,0,10,10" CornerRadius="6" MinWidth="100">
