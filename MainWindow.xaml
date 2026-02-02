@@ -184,11 +184,12 @@
                                 </Style>
                             </TextBox.Style>
                         </TextBox>
-                        <TextBlock Text="Search by selected criteria" 
-                                   Foreground="#607D8B" 
-                                   FontSize="9" 
-                                   Margin="0,4,0,0"/>
-                    </StackPanel>
+                        
+                    <TextBlock Text="Set filters and click Apply below" 
+                               Foreground="#607D8B" 
+                               FontSize="9" 
+                               Margin="0,4,0,0"/>
+                </StackPanel>
 
                     <!-- Error Filter -->
                     <Border Background="#2A3A42" CornerRadius="6" Padding="12,10" Margin="0,0,0,18">
@@ -381,20 +382,37 @@
 
 
                     <!-- Action Buttons -->
-                    <StackPanel>
-                        <Button Command="{Binding ApplyFiltersCommand}" Height="40" Background="#2196F3" Foreground="White" 
-                                BorderThickness="0" FontWeight="Bold" Margin="0,0,0,10" Cursor="Hand" Padding="0,8">
-                            <TextBlock Text="APPLY FILTERS" FontSize="12"/>
+                    <StackPanel Margin="0,10,0,0">
+                        <Button Command="{Binding ApplyFiltersCommand}" Height="42" Background="#00BCD4" Foreground="White" 
+                                BorderThickness="0" FontWeight="Bold" Margin="0,0,0,12" Cursor="Hand">
+                            <Button.Resources>
+                                <Style TargetType="Border">
+                                    <Setter Property="CornerRadius" Value="6"/>
+                                </Style>
+                            </Button.Resources>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🔍" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="APPLY FILTERS" FontSize="13" VerticalAlignment="Center"/>
+                            </StackPanel>
                         </Button>
-                        <Button Command="{Binding ClearFiltersCommand}" Height="40" Background="Transparent" 
-                                Foreground="#B0BEC5" BorderBrush="#455A64" BorderThickness="1" Cursor="Hand" Padding="0,8">
-                            <TextBlock Text="CLEAR FILTERS" FontSize="12"/>
+                        
+                        <Button Command="{Binding ClearFiltersCommand}" Height="36" Background="Transparent" 
+                                Foreground="#90A4AE" BorderBrush="#546E7A" BorderThickness="1" Cursor="Hand">
+                            <Button.Resources>
+                                <Style TargetType="Border">
+                                    <Setter Property="CornerRadius" Value="6"/>
+                                </Style>
+                            </Button.Resources>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="❌" FontSize="10" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="CLEAR ALL" FontSize="11" VerticalAlignment="Center"/>
+                            </StackPanel>
                         </Button>
                     </StackPanel>
                     
                     <!-- Status Message -->
                     <Border Background="#2A3A42" CornerRadius="6" Padding="10" Margin="0,18,0,0">
-                        <TextBlock Text="{Binding StatusMessage}" Foreground="#FFD54F" TextWrapping="Wrap" FontSize="10" TextAlignment="Center" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding StatusMessage}" Foreground="#FFD54F" TextWrapping="Wrap" FontSize="13" TextAlignment="Center" FontWeight="SemiBold"/>
                     </Border>
                 </StackPanel>
             </ScrollViewer>
