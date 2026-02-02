@@ -17,6 +17,7 @@ namespace IISLogAnalyzer_WPF.ViewModels
     {
         private readonly LogParser _parser;
         private List<LogEntry> _allLogs = new();
+        private CancellationTokenSource? _filterCancellationTokenSource;
 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string? propertyName = null) => 
@@ -90,17 +91,32 @@ namespace IISLogAnalyzer_WPF.ViewModels
             get => _searchType;
             set
             {
-                if (SetProperty(ref _searchType, value)) ApplyFilters();
+                if (SetProperty(ref _searchType, value))
+                {
+                    _ = ApplyFiltersAsync(); // Fire and forget
+                }
             }
         }
 
+        private System.Threading.Timer? _searchDebounceTimer;
         private string _searchText = "";
         public string SearchText
         {
             get => _searchText;
             set
             {
-                if (SetProperty(ref _searchText, value)) ApplyFilters();
+                if (SetProperty(ref _searchText, value))
+                {
+                    // Debounce search input - wait 300ms after user stops typing
+                    _searchDebounceTimer?.Dispose();
+                    _searchDebounceTimer = new System.Threading.Timer(_ =>
+                    {
+                        System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
+                        {
+                            await ApplyFiltersAsync();
+                        });
+                    }, null, 300, System.Threading.Timeout.Infinite);
+                }
             }
         }
 
@@ -110,7 +126,10 @@ namespace IISLogAnalyzer_WPF.ViewModels
             get => _showErrorsOnly; 
             set 
             {
-                if (SetProperty(ref _showErrorsOnly, value)) ApplyFilters();
+                if (SetProperty(ref _showErrorsOnly, value))
+                {
+                    _ = ApplyFiltersAsync(); // Fire and forget
+                }
             }
         }
 
@@ -388,7 +407,7 @@ namespace IISLogAnalyzer_WPF.ViewModels
             _parser = new LogParser();
             LoadLogsCommand = new SimpleRelayCommand(async (o) => await LoadLogsAsync());
             ClearFiltersCommand = new SimpleRelayCommand((o) => ClearFilters());
-            ApplyFiltersCommand = new SimpleRelayCommand((o) => ApplyFilters());
+            ApplyFiltersCommand = new SimpleRelayCommand(async (o) => await ApplyFiltersAsync());
         }
 
 
@@ -425,7 +444,7 @@ namespace IISLogAnalyzer_WPF.ViewModels
              OnPropertyChanged(nameof(StartDateDisplay));
              OnPropertyChanged(nameof(EndDateDisplay));
              
-             ApplyFilters();
+             _ = ApplyFiltersAsync(); // Fire and forget
         }
 
 
@@ -467,96 +486,196 @@ namespace IISLogAnalyzer_WPF.ViewModels
             }
         }
 
-        private void ApplyFilters()
+        private async Task ApplyFiltersAsync()
         {
-            var query = _allLogs.AsEnumerable();
+            // Cancel previous filter operation if still running
+            _filterCancellationTokenSource?.Cancel();
+            _filterCancellationTokenSource = new CancellationTokenSource();
+            var cancellationToken = _filterCancellationTokenSource.Token;
 
-            // Error filter
-            if (ShowErrorsOnly) query = query.Where(l => l.IsError);
+            // Capture filter values to avoid closure issues
+            var showErrors = ShowErrorsOnly;
+            var searchText = SearchText;
+            var searchType = SearchType;
+            var startDate = StartDate;
+            var startTime = StartTime;
+            var endDate = EndDate;
+            var endTime = EndTime;
 
-            // Search filter
-            if (!string.IsNullOrWhiteSpace(SearchText))
+            try
             {
-                switch (SearchType)
+                // Run filtering on background thread
+                var (filteredList, stats) = await Task.Run(() =>
                 {
-                    case "URL":
-                        query = query.Where(l =>
-                            l.UriStem.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
-                            l.UriQuery.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
-                        break;
-                    case "IP":
-                        query = query.Where(l =>
-                            l.ClientIp.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
-                        break;
-                    case "Method":
-                        query = query.Where(l =>
-                            l.Method.Equals(SearchText, StringComparison.OrdinalIgnoreCase));
-                        break;
-                    case "Status":
-                        if (int.TryParse(SearchText, out int statusCode))
+                    var query = _allLogs.AsEnumerable();
+
+                    // Check cancellation early
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    // Error filter
+                    if (showErrors) query = query.Where(l => l.IsError);
+
+                    // Search filter
+                    if (!string.IsNullOrWhiteSpace(searchText))
+                    {
+                        switch (searchType)
                         {
-                            query = query.Where(l => l.StatusCode == statusCode);
+                            case "URL":
+                                query = query.Where(l =>
+                                    l.UriStem.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                                    l.UriQuery.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+                                break;
+                            case "IP":
+                                query = query.Where(l =>
+                                    l.ClientIp.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+                                break;
+                            case "Method":
+                                query = query.Where(l =>
+                                    l.Method.Equals(searchText, StringComparison.OrdinalIgnoreCase));
+                                break;
+                            case "Status":
+                                if (int.TryParse(searchText, out int statusCode))
+                                {
+                                    query = query.Where(l => l.StatusCode == statusCode);
+                                }
+                                break;
                         }
-                        break;
+                    }
+
+                    // Date & Time filters
+                    if (startDate.HasValue)
+                    {
+                        var start = startDate.Value.Date + (startTime?.TimeOfDay ?? TimeSpan.Zero);
+                        query = query.Where(l => l.Timestamp >= start);
+                    }
+
+                    if (endDate.HasValue)
+                    {
+                        var end = endDate.Value.Date + (endTime?.TimeOfDay ?? TimeSpan.FromHours(23).Add(TimeSpan.FromMinutes(59)).Add(TimeSpan.FromSeconds(59)));
+                        query = query.Where(l => l.Timestamp <= end);
+                    }
+
+                    // Check cancellation before expensive operation
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var result = query.ToList();
+
+                    // Check cancellation before statistics
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    // Calculate all statistics in a single pass
+                    int successCount = 0, errorCount = 0, redirectCount = 0;
+                    int clientErrorCount = 0, serverErrorCount = 0;
+                    int getCount = 0, postCount = 0, tokenCount = 0;
+                    int maxTimeTaken = 0;
+                    var uniqueIps = new HashSet<string>();
+                    var urlCounts = new Dictionary<string, int>();
+
+                    foreach (var log in result)
+                    {
+                        // Check cancellation periodically (every 1000 items)
+                        if (successCount % 1000 == 0)
+                            cancellationToken.ThrowIfCancellationRequested();
+
+                        // Status code categories
+                        if (log.StatusCode >= 200 && log.StatusCode < 300) successCount++;
+                        if (log.IsError) errorCount++;
+                        if (log.StatusCode >= 300 && log.StatusCode < 400) redirectCount++;
+                        if (log.StatusCode >= 400 && log.StatusCode < 500) clientErrorCount++;
+                        if (log.StatusCode >= 500 && log.StatusCode < 600) serverErrorCount++;
+
+                        // HTTP methods
+                        if (log.Method.Equals("GET", StringComparison.OrdinalIgnoreCase)) getCount++;
+                        if (log.Method.Equals("POST", StringComparison.OrdinalIgnoreCase)) postCount++;
+
+                        // Unique IPs
+                        uniqueIps.Add(log.ClientIp);
+
+                        // Token endpoint
+                        if (log.UriStem.Contains("/token", StringComparison.OrdinalIgnoreCase) ||
+                            log.UriQuery.Contains("token", StringComparison.OrdinalIgnoreCase))
+                            tokenCount++;
+
+                        // URL grouping
+                        if (!urlCounts.ContainsKey(log.UriStem))
+                            urlCounts[log.UriStem] = 0;
+                        urlCounts[log.UriStem]++;
+
+                        // Max time taken
+                        if (log.TimeTaken > maxTimeTaken)
+                            maxTimeTaken = log.TimeTaken;
+                    }
+
+                    // Find most requested URL
+                    string mostRequested = "-";
+                    if (urlCounts.Count > 0)
+                    {
+                        mostRequested = urlCounts.OrderByDescending(kvp => kvp.Value).First().Key;
+                    }
+
+                    var statistics = new FilterStatistics
+                    {
+                        TotalCount = result.Count,
+                        SuccessCount = successCount,
+                        ErrorCount = errorCount,
+                        RedirectCount = redirectCount,
+                        ClientErrorCount = clientErrorCount,
+                        ServerErrorCount = serverErrorCount,
+                        GetRequestCount = getCount,
+                        PostRequestCount = postCount,
+                        UniqueIpCount = uniqueIps.Count,
+                        TokenEndpointCount = tokenCount,
+                        MostRequestedUrl = mostRequested,
+                        SlowestResponseTime = maxTimeTaken
+                    };
+
+                    return (result, statistics);
+                }, cancellationToken);
+
+                // Update UI on UI thread (only if not cancelled)
+                FilteredLogs.Clear();
+                foreach (var log in filteredList)
+                {
+                    FilteredLogs.Add(log);
                 }
-            }
 
-            // Date & Time filters
-            if (StartDate.HasValue)
+                // Update statistics
+                TotalRequests = stats.TotalCount;
+                SuccessCount = stats.SuccessCount;
+                ErrorCount = stats.ErrorCount;
+                RedirectCount = stats.RedirectCount;
+                ClientErrorCount = stats.ClientErrorCount;
+                ServerErrorCount = stats.ServerErrorCount;
+                GetRequestCount = stats.GetRequestCount;
+                PostRequestCount = stats.PostRequestCount;
+                UniqueIpCount = stats.UniqueIpCount;
+                TokenEndpointCount = stats.TokenEndpointCount;
+                MostRequestedUrl = stats.MostRequestedUrl;
+                SlowestResponseTime = stats.SlowestResponseTime;
+            }
+            catch (OperationCanceledException)
             {
-                var start = StartDate.Value.Date + (StartTime?.TimeOfDay ?? TimeSpan.Zero);
-                query = query.Where(l => l.Timestamp >= start);
+                // Filter was cancelled - this is normal, just ignore
             }
-
-            if (EndDate.HasValue)
-            {
-                var end = EndDate.Value.Date + (EndTime?.TimeOfDay ?? TimeSpan.FromHours(23).Add(TimeSpan.FromMinutes(59)).Add(TimeSpan.FromSeconds(59)));
-                query = query.Where(l => l.Timestamp <= end);
-            }
-
-
-            var result = query.ToList();
-
-            FilteredLogs.Clear();
-            foreach (var log in result) FilteredLogs.Add(log);
-
-            TotalRequests = result.Count;
-            SuccessCount = result.Count(l => l.StatusCode >= 200 && l.StatusCode < 300);
-            ErrorCount = result.Count(l => l.IsError);
-            
-            // HTTP Status Code Breakdown
-            RedirectCount = result.Count(l => l.StatusCode >= 300 && l.StatusCode < 400);
-            ClientErrorCount = result.Count(l => l.StatusCode >= 400 && l.StatusCode < 500);
-            ServerErrorCount = result.Count(l => l.StatusCode >= 500 && l.StatusCode < 600);
-            
-            // HTTP Method Breakdown
-            GetRequestCount = result.Count(l => l.Method.Equals("GET", StringComparison.OrdinalIgnoreCase));
-            PostRequestCount = result.Count(l => l.Method.Equals("POST", StringComparison.OrdinalIgnoreCase));
-
-            UniqueIpCount = result.Select(l => l.ClientIp).Distinct().Count();
-
-            // New Metrics
-            // Token endpoint count
-            TokenEndpointCount = result.Count(l => 
-                l.UriStem.Contains("/token", StringComparison.OrdinalIgnoreCase) || 
-                l.UriQuery.Contains("token", StringComparison.OrdinalIgnoreCase));
-
-            // Most requested URL
-            if (result.Any())
-            {
-                var urlGroups = result.GroupBy(l => l.UriStem)
-                                      .OrderByDescending(g => g.Count())
-                                      .FirstOrDefault();
-                MostRequestedUrl = urlGroups?.Key ?? "-";
-            }
-            else
-            {
-                MostRequestedUrl = "-";
-            }
-
-            // Slowest response time
-            SlowestResponseTime = result.Any() ? result.Max(l => l.TimeTaken) : 0;
         }
+
+        // Helper class for statistics
+        private class FilterStatistics
+        {
+            public int TotalCount { get; set; }
+            public int SuccessCount { get; set; }
+            public int ErrorCount { get; set; }
+            public int RedirectCount { get; set; }
+            public int ClientErrorCount { get; set; }
+            public int ServerErrorCount { get; set; }
+            public int GetRequestCount { get; set; }
+            public int PostRequestCount { get; set; }
+            public int UniqueIpCount { get; set; }
+            public int TokenEndpointCount { get; set; }
+            public string MostRequestedUrl { get; set; } = "-";
+            public int SlowestResponseTime { get; set; }
+        }
+
 
 
     }

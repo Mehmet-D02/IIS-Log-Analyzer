@@ -505,7 +505,13 @@
                       Background="White"
                       BorderThickness="0"
                       RowHeight="34"
-                      Margin="15,0,15,15">
+                      Margin="15,0,15,15"
+                      VirtualizingPanel.IsVirtualizing="True"
+                      VirtualizingPanel.VirtualizationMode="Recycling"
+                      VirtualizingPanel.CacheLength="20,20"
+                      VirtualizingPanel.CacheLengthUnit="Item"
+                      EnableRowVirtualization="True"
+                      EnableColumnVirtualization="False">
                 
                 <DataGrid.Resources>
                     <Style TargetType="DataGridColumnHeader">
